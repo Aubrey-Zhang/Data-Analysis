@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta
+    name="viewport"
+    content="initial-scale=1,maximum-scale=1,user-scalable=no"
+  />
+
+    <title>Point clustering - 2021 Crimes in Buffalo, NY</title>
+
+    <style>
+      html,
+      body,
+      #viewDiv {
+        padding: 0;
+        margin: 0;
+        height: 100%;
+        width: 100%;
+        background: rgba(50,50,50);
+      }
+      #infoDiv {
+        padding: 10px;
+      }
+    </style>
+
+    <link rel="stylesheet" href="https://js.arcgis.com/4.18/esri/themes/dark-blue/main.css" />
+    <script src="https://js.arcgis.com/4.18/"></script>
+
+    <script>
+      require([
+          "esri/layers/OpenStreetMapLayer",
+          "esri/Map",
+          "esri/layers/FeatureLayer",
+          "esri/layers/GeoJSONLayer",
+          "esri/views/MapView",
+          "esri/widgets/Legend",
+          "esri/widgets/Expand",
+          "esri/widgets/Home"
+      ], function(OpenStreetMapLayer, Map, FeatureLayer, GeoJSONLayer, MapView, Legend, Expand, Home) {
+
+        // Configures clustering on the layer. A cluster radius
+        // of 100px indicates an area comprising screen space 100px
+        // in length from the center of the cluster
+        const clusterConfig = {
+          type: "cluster",
+          clusterRadius: "100px",
+          // {cluster_count} is an aggregate field containing
+          // the number of features comprised by the cluster
+          popupTemplate: {
+            content: "This cluster represents {cluster_count} crimes.",
+            fieldInfos: [{
+              fieldName: "cluster_count",
+              format: {
+                places: 0,
+                digitSeparator: true
+              }
+            }]
+          },
+          clusterMinSize: "24px",
+          clusterMaxSize: "60px",
+          labelingInfo: [{
+            deconflictionStrategy: "none",
+            labelExpressionInfo: {
+              expression: "Text($feature.cluster_count, '#,###')"
+            },
+            symbol: {
+              type: "text",
+              color: "#004a5d",
+              font: {
+                weight: "bold",
+                family: "Noto Sans",
+                size: "12px"
+              }
+            },
+            labelPlacement: "center-center",
+          }]
+        }
+       
+        const layer = new GeoJSONLayer({
+          title: "Crimes in Buffalo NY",
+          url: "https://data.buffalony.gov/resource/d6g9-xbgu.geojson?$limit=1000000&" +
+          '$where=incident_datetime>=%272021-01-01T00:00:00%27&$select=date_extract_y(incident_datetime) as yr,date_extract_m(incident_datetime) as mth,date_extract_d(incident_datetime) as day,location,incident_type_primary,neighborhood_1',
+          copyright: "City of Buffalo",
+          featureReduction: clusterConfig,
+          
+          // popupTemplates can still be viewed on
+          // individual features
+          popupTemplate: {
+            title: "Crime Info",
+            content: "A(n) {incident_type_primary} in the {neighborhood_1} neighborhood occurred on {mth}/{day}/{yr}.",
+          },
+          renderer: {
+            type: "simple",
+            field: "incident_type_primary",
+            symbol: {
+              type: "simple-marker",
+              size: 6,
+              color: "#faf746",
+              outline: {
+                color: "rgba(204, 201, 33, 0.5)",
+                width: 3
+              }
+            }
+          }
+        });
+
+        // background layer for geographic context
+        
+        const osmLayer = new OpenStreetMapLayer();
+        
+        const map = new Map({
+          layers: [osmLayer, layer]
+        });
+
+        const view = new MapView({
+          container: "viewDiv",
+          extent: {
+            spatialReference: {
+              wkid: 3857
+            },
+            xmin: -8783321.030159036,
+            ymin:  5288063.8979668961,
+            xmax: -8772593.2957379,
+            ymax: 5305117.415808167
+          },
+          spatialReference: {
+            // WGS_1984_EPSG_3857
+            wkid: 3857
+          },
+          constraints: {
+            minScale: 15469455
+          },
+          map: map
+        });
+
+        view.ui.add(new Home({
+          view: view
+        }), "top-left");
+
+        const legend = new Legend({
+          view: view,
+          container: "legendDiv"
+        });
+
+        const infoDiv = document.getElementById("infoDiv");
+        view.ui.add(new Expand({
+          view: view,
+          content: infoDiv,
+          expandIconClass: "esri-icon-layer-list",
+          expanded: false
+        }), "top-left");
+
+        const toggleButton = document.getElementById("cluster");
+
+        // To turn off clustering on a layer, set the
+        // featureReduction property to null
+        toggleButton.addEventListener("click", function(){
+          let fr = layer.featureReduction;
+          layer.featureReduction = fr && fr.type === "cluster" ? null : clusterConfig;
+          toggleButton.innerText = toggleButton.innerText === "Enable Clustering" ? "Disable Clustering" : "Enable Clustering";
+        });
+      });
+    </script>
+  </head>
+
+  <body>
+    <div id="viewDiv"></div>
+    <div id="infoDiv" class="esri-widget">
+      <button id="cluster" class="esri-button">Disable Clustering</button>
+      <div id="legendDiv"></div>
+    </div>
+  </body>
+</html>
